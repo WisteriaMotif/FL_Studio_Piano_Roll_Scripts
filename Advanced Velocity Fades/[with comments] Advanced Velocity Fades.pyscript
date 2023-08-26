@@ -83,7 +83,7 @@ def apply(settingsWindow):
         # this one was a bit annoying because I needed to flip the graph of the exponentially changing values horizontally
             percentage = percentage - (1 - percentage) ** (curve_value * -1 + 1) - percentage + 1
 
-        # so the (almost final) calculated velocity gets calculated in to halves, separated by a + in the middle
+        # so the (almost final) calculated velocity gets calculated in two halves, separated by a + in the middle
         # the first half is fairly simple. The velocity_difference was calculated even before the for loop and gets multiplied by the percentage value. So the further you are to the rightmost note, the more of the velocity difference you get.
         # but this is only a velocity difference. Since the starting point is the leftmost point, we still need to add the "Velocity L" from the knob
         # the latter half (pinch_velocity * settingsWindow.GetInputValue('Dynamic')) is fairly straight forward as well. The pinch velocity is the final velocity offset the note has from a straight line (as described in the Dynamic Pinch section) but the "Dynamic" knob has the final say about the amount
