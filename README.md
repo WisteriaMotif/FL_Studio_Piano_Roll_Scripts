@@ -7,6 +7,6 @@ A collection of my python scrips for the FL Studio Piano Roll.
 
 - Velocity L/R: The velocity of the leftmost/rightmost note(s).
 - Dynamic: The overall dynamic of the notes. The default value is 1. Values over 1 will increase the dynamic.
-- Dynamic Pinch: Reduces the dynamic towardas the outmost notes. Values below 0 will pinch towards the left, while values over 0 will pinch towards the right.
+- Dynamic Pinch: Reduces the dynamic towards the outmost notes. Values below 0 will pinch towards the left, while values over 0 will pinch towards the right.
 - Curve: Adds a curve to the fade.
 - Zero Velocity Protection: Stops notes' velocity from becoming 0. Helpful for instruments that simply don't play notes when the velocity is 0, yet you still want the notes audible.
