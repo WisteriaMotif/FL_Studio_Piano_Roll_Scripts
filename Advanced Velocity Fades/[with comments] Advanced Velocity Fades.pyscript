@@ -1,0 +1,102 @@
+from flpianoroll import *
+
+######################################################################
+#           Advanced Velocity Fades v1.0 by Wisteria Motif           #
+# For more information or potential updates check the FL Studio      #
+# Piano roll scripting subforum or my github page:                   #
+# https://github.com/WisteriaMotif/FL_Studio_Piano_Roll_Scripts/     #
+######################################################################
+
+#The script throws an error when there are no notes in the current piano roll. I could work around getting an error, but I felt this was simpler since something like sys.exit() doesn't exist
+if score.noteCount == 0:
+    Utils.ShowMessage("There are no notes to work with.\r\nYou will get an error message after clicking 'Ok'.\r\nJust close that message and try again... but maybe with notes...")
+
+# these two variables will be the initial velocity values for the L and the R points of the velocity curve
+# if for example the left most point L is a single note it will just take that note's velocity, but if it's multiple notes at the exact same time it will become an average of those notes
+init_velocity_L = 0
+init_velocity_R = 0
+# these two lists are needed to calculate the averages
+L_vel_list = []
+R_vel_list = []
+
+# averages out velocity if start or end are a chord/multiple notes played at the same time
+for i in range(0, score.noteCount):
+    if score.getNote(i).time == score.getNote(0).time:
+        L_vel_list.append(score.getNote(i).velocity)
+    if score.getNote(i).time == score.getNote(score.noteCount - 1).time:
+        R_vel_list.append(score.getNote(i).velocity)
+init_velocity_L = sum(L_vel_list) / len(L_vel_list)
+init_velocity_R = sum(R_vel_list) / len(R_vel_list)
+
+# creates the dialogue box, note that the starting values for Velocity L and R are the initial averages
+def createDialog():
+    settingsWindow = ScriptDialog("### Advanced Velocity Fades v1.0 by Wisteria Motif ###", "Velocity L/R: The velocity of the leftmost/rightmost note(s).\r\nDynamic: The overall dynamic of the notes.\r\nDynamic Pinch: Reduces the dynamic towards the outmost notes.\r\nCurve: Adds a curve to the fade.\r\nZero Velocity Protection: Stops notes' velocity from becoming 0.\r\n - Script by Wisteria Motif - ")
+    settingsWindow.AddInputKnob('Velocity L', init_velocity_L, 0, 1)
+    settingsWindow.AddInputKnob('Velocity R', init_velocity_R, 0, 1)
+    settingsWindow.AddInputKnob('Dynamic', 1, 0, 2)
+    settingsWindow.AddInputKnob('Dynamic Pinch', 0, -1, 1)
+    settingsWindow.AddInputKnob('Curve', 0, -10, 10)
+    settingsWindow.AddInputCheckbox("Zero Velo Protect.", False)
+    return settingsWindow
+
+# the main function
+def apply(settingsWindow):
+    # gets the time of the first and last note (there can be technically some exeptions with what can be considered the first/last note, but the result stays the same)
+    first_note_position = score.getNote(0).time
+    last_note_position = score.getNote(score.noteCount - 1).time
+    # gets the velocity difference set from the VelL and VelR knobs
+    velocity_difference = settingsWindow.GetInputValue('Velocity R') - settingsWindow.GetInputValue('Velocity L')
+
+# the main 'for' loop that in the end changes velocity value for every selected note
+    for i in range(score.noteCount):
+
+        # the 'percentage' variable calculates the percentage of the position of the current note with 0 being all the way to the left (of the selected notes) and 1 being all the way to the right
+        # so if a note would be perfectly in the middle of all selected notes, it would have a percentage of 0.5, if it's 83% from the leftmost selected note to the rightmost, it would have a percentage of 0.83
+        # the very first note(s) get special treatment. This is either the very first note, or if it is a chord with notes starting at the same time, they all get their percentage set to 0 because the formula in the 'else:' part would otherwise divide by zero... which is bad...
+        if score.getNote(i).time == score.getNote(0).time:
+            percentage = 0
+        else:
+            percentage = ((score.getNote(i).time - first_note_position) / (last_note_position - first_note_position))
+
+        # the initial_velocity_offset is the initial offset that the notes would have, if of all the selected notes you'd connect the leftmost note to the rightmost note and draw a straight line between them and look how much the current note i deviates from that line
+        # you could see it a bit as the dynamic of the notes, that is also why if you later (as you'll see in a moment) change the Dynamic Pinch or Dynamic knob values, they interact with this velocity offset
+        initial_velocity_offset = score.getNote(i).velocity - (init_velocity_L + ((init_velocity_R - init_velocity_L) * percentage))
+
+        # the Dynamic Pinch tilts the Dynamic of the notes towards the left or the right (so the beginning or the end)
+        # the pinch_velocity is simply the initial_velocity_offset, but adjusted for the pinch values
+        # it uses the percentage of the note to determine how far to the sides the note is and thus how strong the pinch effect is (percentage * initial_velocity_offset) that value gets adjusted by the knob (ettingsWindow.GetInputValue('Dynamic Pinch')))
+        if settingsWindow.GetInputValue('Dynamic Pinch') >= 0:
+            pinch_velocity = (initial_velocity_offset - percentage * initial_velocity_offset * settingsWindow.GetInputValue('Dynamic Pinch'))
+        else:
+            # this is for negative "Dynamic Pinch" values, so a pinch to the left. That's why there is "1 - percentage" and the whole thing gets multiplied by -1
+            pinch_velocity = (initial_velocity_offset - (1 - percentage) * initial_velocity_offset * settingsWindow.GetInputValue('Dynamic Pinch') * -1)
+
+        # the curve_value variable is simply an adjusted version of the "Curve" knob. I didn't want the knob to behave linear, but to be softer for the lower values (around -3 to 3) and stronger for the higher values (everything below -7 or above 7)
+        # to do that I divided the value of the knob (that goes up to 10) by 10, then cubed it and multiplied it again by 10. This gave it the more exponential curve I wanted
+        curve_value = (settingsWindow.GetInputValue('Curve') / 10) ** 3 * 10
+
+        # this part is a bit tricky. So to get the velocity curve to behave exponentially/logarithmically instead of being a straight line, I tinkered with the percentage value from above. (See comments above about 'percentage'.)
+        # I tricked notes into thinking that they are positioned more to the left or to the right than they actually are by changing the 'percentage' value. So if a note was positioned 0.25 from the left, it might now think it's positioned 0.18 from the left and thus change its velocity accordingly.
+        if settingsWindow.GetInputValue('Curve') >= 0:
+            percentage = percentage ** (curve_value + 1)
+        elif settingsWindow.GetInputValue('Curve') < 0:
+        # this one was a bit annoying because I needed to flip the graph of the exponentially changing values horizontally
+            percentage = percentage - (1 - percentage) ** (curve_value * -1 + 1) - percentage + 1
+
+        # so the (almost final) calculated velocity gets calculated in to halves, separated by a + in the middle
+        # the first half is fairly simple. The velocity_difference was calculated even before the for loop and gets multiplied by the percentage value. So the further you are to the rightmost note, the more of the velocity difference you get.
+        # but this is only a velocity difference. Since the starting point is the leftmost point, we still need to add the "Velocity L" from the knob
+        # the latter half (pinch_velocity * settingsWindow.GetInputValue('Dynamic')) is fairly straight forward as well. The pinch velocity is the final velocity offset the note has from a straight line (as described in the Dynamic Pinch section) but the "Dynamic" knob has the final say about the amount
+        calculated_velocity = (settingsWindow.GetInputValue('Velocity L') + (velocity_difference * percentage)) + pinch_velocity * settingsWindow.GetInputValue('Dynamic')
+
+        # this keeps all velocity values in bound, in case some would go above a value of 1 or below 0
+        if calculated_velocity < 0:
+            calculated_velocity = 0
+        if calculated_velocity > 1:
+            calculated_velocity = 1
+        # the Zero Velocity Protection prevents notes from going below a velocity from 0.01
+        if calculated_velocity <= 0.01 and settingsWindow.GetInputValue('Zero Velo Protect.'):
+            calculated_velocity = 0.01
+
+        # the final step - simply assigns the calculated velocity to the current note i in the for loop
+        score.getNote(i).velocity = calculated_velocity
