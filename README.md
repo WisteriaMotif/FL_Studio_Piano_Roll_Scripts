@@ -3,6 +3,7 @@ A collection of my python scrips for the FL Studio Piano Roll.
 *(Well, for now there is only one script, but who knows.)*
 
 ## Advanced Velocity Fades
+[Link to FL Studio Forum post.](https://forum.image-line.com/viewtopic.php?t=311614)
 ![Advanced Velocity Fades preview image](https://github.com/WisteriaMotif/FL_Studio_Piano_Roll_Scripts/assets/143191748/d9076409-efb6-40c7-8eb1-8c1b2ed96f4b)
 
 - Velocity L/R: The velocity of the leftmost/rightmost note(s).
